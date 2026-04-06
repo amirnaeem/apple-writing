@@ -605,3 +605,81 @@ class TestJsonMode:
             with pytest.raises(SystemExit) as exc:
                 await M._run_pipe_json("some text", cmd, guardrails=0)
         assert exc.value.code == 130
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. Named sessions
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestNamedSessions:
+
+    def _patch(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(S, "SESSIONS_DIR", tmp_path / "sessions")
+
+    def test_save_named_session_creates_named_file(self, tmp_path, monkeypatch):
+        """save_transcript with name= writes <name>.json."""
+        self._patch(monkeypatch, tmp_path)
+        path = S.save_transcript({"x": 1}, name="myproject")
+        assert path.name == "myproject.json"
+
+    def test_save_named_session_is_in_sessions_dir(self, tmp_path, monkeypatch):
+        """Named session file lands in the sessions directory."""
+        self._patch(monkeypatch, tmp_path)
+        path = S.save_transcript({"x": 1}, name="work")
+        assert path.parent == (tmp_path / "sessions")
+
+    def test_load_named_session_returns_data(self, tmp_path, monkeypatch):
+        """load_transcript(name=) returns the saved data."""
+        self._patch(monkeypatch, tmp_path)
+        S.save_transcript({"project": "alpha"}, name="alpha")
+        result = S.load_transcript(name="alpha")
+        assert result == {"project": "alpha"}
+
+    def test_load_named_session_returns_none_when_missing(self, tmp_path, monkeypatch):
+        """load_transcript for unknown name returns None."""
+        self._patch(monkeypatch, tmp_path)
+        result = S.load_transcript(name="nonexistent")
+        assert result is None
+
+    def test_save_named_overwrites_existing(self, tmp_path, monkeypatch):
+        """Saving a named session twice updates the file in place."""
+        self._patch(monkeypatch, tmp_path)
+        S.save_transcript({"v": 1}, name="proj")
+        S.save_transcript({"v": 2}, name="proj")
+        result = S.load_transcript(name="proj")
+        assert result == {"v": 2}
+        # Only one file should exist for this name
+        sessions_dir = tmp_path / "sessions"
+        named = list(sessions_dir.glob("proj.json"))
+        assert len(named) == 1
+
+    def test_unnamed_save_unchanged(self, tmp_path, monkeypatch):
+        """save_transcript without name still uses date-based filename."""
+        self._patch(monkeypatch, tmp_path)
+        from datetime import date
+        path = S.save_transcript({"x": 1})
+        assert path.name.startswith(date.today().isoformat())
+
+    def test_session_flag_parsed_by_argparse(self, monkeypatch):
+        """--session flag is recognized by _parse_args."""
+        from apple_tui import __main__ as M
+        monkeypatch.setattr(sys, "argv", ["ai", "--session", "myproject"])
+        args = M._parse_args()
+        assert args.session == "myproject"
+
+    def test_session_flag_default_is_none(self, monkeypatch):
+        """--session defaults to None."""
+        from apple_tui import __main__ as M
+        monkeypatch.setattr(sys, "argv", ["ai"])
+        args = M._parse_args()
+        assert args.session is None
+
+    def test_list_named_sessions_returns_named_files(self, tmp_path, monkeypatch):
+        """list_sessions returns named .json files."""
+        self._patch(monkeypatch, tmp_path)
+        S.save_transcript({"x": 1}, name="alpha")
+        S.save_transcript({"x": 2}, name="beta")
+        sessions = S.list_sessions()
+        names = {p.stem for p in sessions}
+        assert "alpha" in names
+        assert "beta" in names

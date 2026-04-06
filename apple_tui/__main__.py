@@ -88,6 +88,8 @@ def _parse_args() -> argparse.Namespace:
                         help="Guardrail mode for the session (default: default)")
     parser.add_argument("--json", action="store_true", default=False,
                         help="Output structured JSON array (use with list commands)")
+    parser.add_argument("--session", default=None, metavar="NAME",
+                        help="Named session to load/save (default: date-based)")
     return parser.parse_args()
 
 

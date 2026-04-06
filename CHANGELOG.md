@@ -8,6 +8,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-04-06
+
+### Added
+- **Named sessions** — `--session <name>` flag persists and restores a named conversation
+  - `save_transcript(data, name=)` writes `<name>.json`; unnamed uses date-based filename
+  - `load_transcript(name=)` loads by name or falls back to most-recent
+  - `--session` defaults to `None` (existing behaviour unchanged)
+
 ## [0.2.1] — 2026-04-06
 
 ### Added

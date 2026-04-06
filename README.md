@@ -4,7 +4,7 @@ A privacy-first terminal interface to Apple's on-device Foundation Models. Runs 
 
 > Requires macOS 26+ with Apple Intelligence enabled and Apple Silicon.
 
-![Python](https://img.shields.io/badge/python-3.11+-blue) ![macOS](https://img.shields.io/badge/macOS-26+-black) ![License](https://img.shields.io/badge/license-MIT-green) ![Version](https://img.shields.io/badge/version-0.2.0-purple)
+![Python](https://img.shields.io/badge/python-3.11+-blue) ![macOS](https://img.shields.io/badge/macOS-26+-black) ![License](https://img.shields.io/badge/license-MIT-green) ![Version](https://img.shields.io/badge/version-0.2.2-purple)
 
 ---
 
@@ -193,7 +193,7 @@ test_new_modules.py # Module pytest suite (38 tests)
 - [ ] Homebrew formula
 - [ ] `write_file` tool (with confirmation prompt)
 - [x] Structured output mode — `ai --json /actions < notes.txt | jq '.[]'`
-- [ ] Named sessions with `--session <name>`
+- [x] Named sessions with `--session <name>`
 - [ ] Context window usage indicator
 
 ---

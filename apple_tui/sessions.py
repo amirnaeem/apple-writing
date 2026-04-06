@@ -32,16 +32,31 @@ def _today_path() -> Path:
         n += 1
 
 
-def save_transcript(transcript_data: dict) -> Path:
-    """Write transcript dict to disk. Returns the path written."""
-    path = _today_path()
+def save_transcript(transcript_data: dict, name: str | None = None) -> Path:
+    """Write transcript dict to disk. Returns the path written.
+
+    If name is given, writes to <name>.json (overwrites). Otherwise uses a
+    date-based filename.
+    """
+    if name is not None:
+        path = _sessions_dir() / f"{name}.json"
+    else:
+        path = _today_path()
     path.write_text(json.dumps(transcript_data, indent=2), encoding="utf-8")
     return path
 
 
-def load_latest_transcript() -> dict | None:
-    """Load the most recently modified session file, or None if none exist."""
+def load_transcript(name: str | None = None) -> dict | None:
+    """Load a session by name, or the most recently modified session if name is None."""
     base = _sessions_dir()
+    if name is not None:
+        path = base / f"{name}.json"
+        if not path.exists():
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
     files = sorted(base.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not files:
         return None
@@ -49,6 +64,11 @@ def load_latest_transcript() -> dict | None:
         return json.loads(files[0].read_text(encoding="utf-8"))
     except Exception:
         return None
+
+
+def load_latest_transcript() -> dict | None:
+    """Load the most recently modified session file, or None if none exist."""
+    return load_transcript()
 
 
 def list_sessions() -> list[Path]:
