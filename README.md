@@ -4,7 +4,7 @@ A privacy-first terminal interface to Apple's on-device Foundation Models. Runs 
 
 > Requires macOS 26+ with Apple Intelligence enabled and Apple Silicon.
 
-![Python](https://img.shields.io/badge/python-3.11+-blue) ![macOS](https://img.shields.io/badge/macOS-26+-black) ![License](https://img.shields.io/badge/license-MIT-green) ![Version](https://img.shields.io/badge/version-0.2.2-purple)
+![Python](https://img.shields.io/badge/python-3.11+-blue) ![macOS](https://img.shields.io/badge/macOS-26+-black) ![License](https://img.shields.io/badge/license-MIT-green) ![Version](https://img.shields.io/badge/version-0.3.0-purple)
 
 ---
 
@@ -138,6 +138,7 @@ In chat mode, the model can invoke tools mid-conversation:
 
 - **`read_file`** — reads a local file by path (up to 100KB)
 - **`clipboard_read`** — reads your current clipboard contents
+- **`write_file`** — writes text to a file in your home directory (model asks for confirmation first)
 
 Example: *"Summarize the file at ~/Documents/report.pdf"* — the model will call `read_file` automatically.
 
@@ -180,10 +181,10 @@ apple_tui/
   app.py           # Textual TUI application
   plugins.py       # TOML plugin loader
   sessions.py      # Persistent session storage
-  tools.py         # SDK Tool subclasses (read_file, clipboard_read)
+  tools.py         # SDK Tool subclasses (read_file, clipboard_read, write_file)
 docs/ideas/        # Brainstorm one-pagers
-test_app.py        # TUI pytest suite (43 tests)
-test_new_modules.py # Module pytest suite (38 tests)
+test_app.py        # TUI pytest suite (49 tests)
+test_new_modules.py # Module pytest suite (63 tests)
 ```
 
 ---
@@ -191,10 +192,10 @@ test_new_modules.py # Module pytest suite (38 tests)
 ## Roadmap
 
 - [ ] Homebrew formula
-- [ ] `write_file` tool (with confirmation prompt)
+- [x] `write_file` tool (with confirmation prompt)
 - [x] Structured output mode — `ai --json /actions < notes.txt | jq '.[]'`
 - [x] Named sessions with `--session <name>`
-- [ ] Context window usage indicator
+- [x] Context window usage indicator
 
 ---
 

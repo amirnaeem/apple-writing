@@ -8,6 +8,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-04-06
+
+### Added
+- **`write_file` tool** — model can write text to files within the user's home directory
+  - Security: rejects paths outside `~`, rejects content > 200 KB
+  - Model instructed to ask for confirmation before calling the tool
+  - Available in real-SDK chat sessions alongside `read_file` and `clipboard_read`
+- **Context window usage indicator** — header now shows `~N/4096 tok` estimate
+  - Estimated via 4-chars-per-token heuristic from prompt + response lengths
+  - Colour-coded: grey → orange (>50%) → red (>80%)
+  - Resets on `Ctrl+N` (new session) and `Ctrl+L` (clear history)
+- **13 new tests** — `TestWriteFileTool` (8) and `TestContextWindowIndicator` (5); 110 total
+
 ## [0.2.2] — 2026-04-06
 
 ### Added

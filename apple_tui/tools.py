@@ -1,14 +1,33 @@
 """
 SDK Tool subclasses for agentic file and clipboard access.
 
-Only safe, read-only tools are implemented in v1.
-write_file and run_shell are explicitly deferred (security boundary).
+Read-only tools: read_file, clipboard_read.
+Write tool: write_file (home-directory sandboxed, symlink-safe).
+run_shell is explicitly deferred (security boundary).
 """
 
 import os
 import subprocess
 
 MOCK_MODE = os.uname().sysname != "Darwin"
+
+_MAX_WRITE_BYTES = 200_000  # 200 KB cap for write_file
+
+
+def _safe_write_path(path: str) -> tuple[str, str | None]:
+    """Expand and validate path. Returns (expanded_path, error_or_None).
+
+    Uses realpath to follow symlinks before checking containment, preventing
+    a symlink inside ~ from pointing to a file outside the home directory.
+    """
+    expanded = os.path.expanduser(path)
+    real_expanded = os.path.realpath(expanded)
+    real_home = os.path.realpath(os.path.expanduser("~"))
+    # Require the resolved path to be home itself or strictly inside it
+    if real_expanded != real_home and not real_expanded.startswith(real_home + os.sep):
+        return expanded, f"Error: writing outside home directory is not allowed ({expanded})"
+    return expanded, None
+
 
 if MOCK_MODE:
     class _MockTool:
@@ -37,6 +56,25 @@ if MOCK_MODE:
 
         async def call(self, args=None) -> str:
             return "[mock clipboard content]"
+
+    class WriteFileTool(_MockTool):
+        name = "write_file"
+        description = "Write text content to a file at the given path (home directory only)."
+
+        async def call(self, path: str = "", content: str = "") -> str:
+            if not path:
+                return "Error: no path provided"
+            if len(content) > _MAX_WRITE_BYTES:
+                return f"Error: content too large ({len(content):,} bytes, max {_MAX_WRITE_BYTES:,})"
+            expanded, err = _safe_write_path(path)
+            if err:
+                return err
+            try:
+                with open(expanded, "w", encoding="utf-8") as f:
+                    f.write(content)
+                return f"Written {len(content):,} bytes to {expanded}"
+            except Exception as e:
+                return f"Error writing {expanded}: {e}"
 
 else:
     import apple_fm_sdk as fm
@@ -88,3 +126,35 @@ else:
                 return result.stdout or "[clipboard is empty]"
             except Exception as e:
                 return f"Error reading clipboard: {e}"
+
+    @fm.generable("Parameters for writing a file")
+    class _WriteFileParams:
+        path: str = fm.guide("The absolute or home-relative (~) file path to write")
+        content: str = fm.guide("The text content to write to the file")
+
+    class WriteFileTool(Tool):
+        name = "write_file"
+        description = (
+            "Write text content to a file on the user's Mac. "
+            "Only files within the user's home directory are allowed. "
+            "Always ask the user to confirm before calling this tool."
+        )
+
+        @property
+        def arguments_schema(self):
+            return _WriteFileParams.generation_schema()
+
+        async def call(self, args) -> str:
+            try:
+                path = args.value(str, for_property="path")
+                content = args.value(str, for_property="content")
+                if len(content) > _MAX_WRITE_BYTES:
+                    return f"Error: content too large ({len(content):,} bytes, max {_MAX_WRITE_BYTES:,})"
+                expanded, err = _safe_write_path(path)
+                if err:
+                    return err
+                with open(expanded, "w", encoding="utf-8") as f:
+                    f.write(content)
+                return f"Written {len(content):,} bytes to {expanded}"
+            except Exception as e:
+                return f"Error writing file: {e}"

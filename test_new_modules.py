@@ -362,6 +362,83 @@ class TestClipboardReadTool:
         assert len(T.ClipboardReadTool.description) > 0
 
 
+class TestWriteFileTool:
+
+    @pytest.mark.asyncio
+    async def test_writes_content_to_file(self, tmp_path, monkeypatch):
+        """WriteFileTool writes the given content to the given path."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        target = tmp_path / "output.txt"
+        tool = T.WriteFileTool()
+        result = await tool.call(path=str(target), content="hello world")
+        assert target.read_text() == "hello world"
+
+    @pytest.mark.asyncio
+    async def test_returns_success_message(self, tmp_path, monkeypatch):
+        """WriteFileTool returns a confirmation string on success."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        target = tmp_path / "out.txt"
+        tool = T.WriteFileTool()
+        result = await tool.call(path=str(target), content="data")
+        assert isinstance(result, str)
+        assert "wrote" in result.lower() or "written" in result.lower() or str(target) in result
+
+    @pytest.mark.asyncio
+    async def test_returns_error_for_unwritable_path(self, tmp_path, monkeypatch):
+        """WriteFileTool returns an error string when the path is not writable."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        bad = tmp_path / "no_such_dir" / "file.txt"
+        tool = T.WriteFileTool()
+        result = await tool.call(path=str(bad), content="data")
+        assert "error" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_expands_tilde_in_path(self, tmp_path, monkeypatch):
+        """WriteFileTool expands ~ in paths."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        tool = T.WriteFileTool()
+        result = await tool.call(path="~/tilde_test.txt", content="tilde")
+        assert (tmp_path / "tilde_test.txt").read_text() == "tilde"
+
+    @pytest.mark.asyncio
+    async def test_rejects_path_outside_home(self, tmp_path, monkeypatch):
+        """WriteFileTool refuses writes outside the user's home directory."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        tool = T.WriteFileTool()
+        result = await tool.call(path="/etc/passwd", content="hacked")
+        assert "error" in result.lower() or "not allowed" in result.lower() or "denied" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_rejects_oversized_content(self, tmp_path, monkeypatch):
+        """WriteFileTool rejects content larger than the allowed limit (size check, not path check)."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        target = tmp_path / "big.txt"
+        tool = T.WriteFileTool()
+        big_content = "x" * 200_001
+        result = await tool.call(path=str(target), content=big_content)
+        assert "too large" in result.lower()
+        assert not target.exists()
+
+    @pytest.mark.asyncio
+    async def test_rejects_symlink_escaping_home(self, tmp_path, monkeypatch):
+        """WriteFileTool refuses a path that is a symlink pointing outside home."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        outside = tmp_path.parent / "outside.txt"
+        outside.write_text("original")
+        link = tmp_path / "evil_link"
+        link.symlink_to(outside)
+        tool = T.WriteFileTool()
+        result = await tool.call(path=str(link), content="hacked")
+        assert "error" in result.lower() or "not allowed" in result.lower()
+        assert outside.read_text() == "original"  # file must be untouched
+
+    def test_write_file_tool_has_correct_name(self):
+        assert T.WriteFileTool.name == "write_file"
+
+    def test_write_file_tool_has_description(self):
+        assert len(T.WriteFileTool.description) > 0
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 4. Pipe mode / CLI entry point
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -512,6 +589,43 @@ class TestPipeMode:
         with pytest.raises(SystemExit) as exc:
             M.main()
         assert exc.value.code == 130
+
+    def test_binary_stdin_exits_with_error(self, monkeypatch, capsys):
+        """Piping a binary file (e.g. .docx) prints a helpful error and exits 1."""
+        import io
+        from apple_tui import __main__ as M
+
+        # Simulate what Python produces when reading a binary file as text:
+        # surrogate-escaped bytes from a ZIP/docx header (PK\x03\x04 → surrogates)
+        binary_as_text = b"PK\x03\x04\xed\xa0\x80".decode("utf-8", errors="surrogateescape")
+
+        monkeypatch.setattr(sys, "argv", ["ai", "/summarize"])
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+        monkeypatch.setattr(sys, "stdin", io.StringIO(binary_as_text))
+
+        with pytest.raises(SystemExit) as exc:
+            M.main()
+        assert exc.value.code == 1
+        captured = capsys.readouterr()
+        assert "binary" in captured.err.lower() or "text" in captured.err.lower()
+
+    def test_binary_stdin_suggests_conversion(self, monkeypatch, capsys):
+        """Error message for binary stdin mentions how to convert."""
+        import io
+        from apple_tui import __main__ as M
+
+        binary_as_text = b"PK\x03\x04\xed\xa0\x80".decode("utf-8", errors="surrogateescape")
+
+        monkeypatch.setattr(sys, "argv", ["ai", "/summarize"])
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+        monkeypatch.setattr(sys, "stdin", io.StringIO(binary_as_text))
+
+        with pytest.raises(SystemExit) as exc:
+            M.main()
+        assert exc.value.code == 1
+        captured = capsys.readouterr()
+        # Should hint at textutil or plain text conversion
+        assert "textutil" in captured.err or "txt" in captured.err.lower()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

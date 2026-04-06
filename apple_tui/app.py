@@ -184,8 +184,8 @@ def check_availability() -> tuple[bool, Optional[str]]:
 # Tools are stateless and expensive to instantiate on real macOS (C bridge allocation).
 # Create once at module load and reuse across sessions.
 if not MOCK_MODE:
-    from apple_tui.tools import ReadFileTool, ClipboardReadTool
-    _TOOLS = [ReadFileTool(), ClipboardReadTool()]
+    from apple_tui.tools import ReadFileTool, ClipboardReadTool, WriteFileTool
+    _TOOLS = [ReadFileTool(), ClipboardReadTool(), WriteFileTool()]
 else:
     _TOOLS = []
 
@@ -339,6 +339,9 @@ class AppleIntelligenceTUI(App):
     _active_command: Optional[Command] = None
     _spinner_frame: int = 0
     _spinner_timer = None
+    _token_estimate: int = 0  # rough estimate: len(text) // 4
+
+    _CONTEXT_LIMIT = 4096
 
     # ── Layout ─────────────────────────────────────────────────────────────────
 
@@ -362,6 +365,7 @@ class AppleIntelligenceTUI(App):
     # ── Header ─────────────────────────────────────────────────────────────────
 
     def _reset_chat_session(self) -> None:
+        self._token_estimate = 0
         self._chat_session = make_chat_session(self._guardrails)
         self._render_header()
 
@@ -369,10 +373,14 @@ class AppleIntelligenceTUI(App):
         mode  = f"[{C_LABEL3}]mock[/{C_LABEL3}]" if MOCK_MODE else f"[{C_LABEL3}]on-device[/{C_LABEL3}]"
         g_col = C_ORANGE if self._guardrails else C_LABEL3
         g_lbl = "permissive" if self._guardrails else "default"
+        tok_pct = self._token_estimate / self._CONTEXT_LIMIT
+        tok_col = C_RED if tok_pct > 0.8 else (C_ORANGE if tok_pct > 0.5 else C_LABEL3)
+        tok_lbl = f"~{self._token_estimate}/{self._CONTEXT_LIMIT} tok"
         self.query_one("#header", Static).update(
             f"[{C_PURPLE}]◆[/{C_PURPLE}]  {_TITLE_COLORED}"
             f"  [{C_SEP}]│[/{C_SEP}]  {mode}"
             f"  [{C_SEP}]│[/{C_SEP}]  [{g_col}]guardrails: {g_lbl}[/{g_col}]"
+            f"  [{C_SEP}]│[/{C_SEP}]  [{tok_col}]{tok_lbl}[/{tok_col}]"
         )
 
     # ── Availability ────────────────────────────────────────────────────────────
@@ -404,10 +412,12 @@ class AppleIntelligenceTUI(App):
         self._write_divider("new session")
 
     def action_clear_history(self) -> None:
+        self._token_estimate = 0
         self.query_one("#history", RichLog).clear()
         live = self.query_one("#live", Static)
         live.update("")
         live.add_class("idle")
+        self._render_header()
 
     def _write_divider(self, label: str) -> None:
         self.query_one("#history", RichLog).write(
@@ -595,6 +605,10 @@ class AppleIntelligenceTUI(App):
                 # Claude Code-style response block
                 history.write(f"\n[bold {C_PURPLE}]  ◆  Apple Intelligence[/bold {C_PURPLE}]")
                 history.write(f"[{C_LABEL1}]  {escape(last)}[/{C_LABEL1}]\n")
+                # Only accumulate tokens for chat — command sessions are stateless (no history)
+                if command is None:
+                    self._token_estimate += (len(prompt) + len(last)) // 4
+                    self._render_header()
             set_idle()
 
         except Exception as e:
