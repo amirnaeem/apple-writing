@@ -8,6 +8,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-04-06
+
+### Added
+- **`--json` flag** — structured JSON array output for list commands (`/actions`, `/bullets`, `/entities`, `/tag`, `/notify`)
+  - `ai --json /actions < notes.txt | jq '.[]'`
+  - Strips markdown fences from model output before parsing
+  - Falls back to line-splitting if JSON parse fails
+  - Warns on stderr when used with non-list commands
+- **`ai help`** now annotates JSON-capable commands with `[json]` tag
+
 ## [0.2.0] — 2026-04-06
 
 ### Added

@@ -71,8 +71,14 @@ ai "summarize this text"
 ai "what are the action items?" < meeting-notes.txt
 cat contract.txt | ai /formal
 
+# Structured JSON output (pipe to jq)
+ai --json /actions < meeting-notes.txt
+ai --json /bullets < report.txt | jq '.[]'
+cat notes.txt | ai --json /tag
+
 # With options
 ai --guardrails permissive "rewrite this"
+ai help
 ```
 
 ### Keyboard shortcuts
@@ -186,7 +192,7 @@ test_new_modules.py # Module pytest suite (38 tests)
 
 - [ ] Homebrew formula
 - [ ] `write_file` tool (with confirmation prompt)
-- [ ] Structured output mode — pipe `/actions` to `jq`
+- [x] Structured output mode — `ai --json /actions < notes.txt | jq '.[]'`
 - [ ] Named sessions with `--session <name>`
 - [ ] Context window usage indicator
 

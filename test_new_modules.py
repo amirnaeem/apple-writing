@@ -512,3 +512,96 @@ class TestPipeMode:
         with pytest.raises(SystemExit) as exc:
             M.main()
         assert exc.value.code == 130
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. Structured output / JSON mode
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestJsonMode:
+
+    @pytest.mark.asyncio
+    async def test_run_pipe_json_outputs_valid_json(self, capsys):
+        """`--json` with a list command outputs valid JSON to stdout."""
+        from apple_tui.__main__ import _run_pipe_json
+        from apple_tui.app import COMMANDS
+        cmd = next(c for c in COMMANDS if c.name == "/actions")
+        await _run_pipe_json("Buy milk. Call John. Write report.", cmd, guardrails=0)
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out)
+        assert isinstance(data, list)
+        assert len(data) > 0
+
+    @pytest.mark.asyncio
+    async def test_run_pipe_json_each_item_is_string(self, capsys):
+        """JSON output items are strings."""
+        from apple_tui.__main__ import _run_pipe_json
+        from apple_tui.app import COMMANDS
+        cmd = next(c for c in COMMANDS if c.name == "/bullets")
+        await _run_pipe_json("Python is fast. Python is readable.", cmd, guardrails=0)
+        captured = capsys.readouterr()
+        import json
+        data = json.loads(captured.out)
+        assert all(isinstance(item, str) for item in data)
+
+    @pytest.mark.asyncio
+    async def test_run_pipe_json_ends_with_newline(self, capsys):
+        """JSON output ends with a newline for clean piping."""
+        from apple_tui.__main__ import _run_pipe_json
+        from apple_tui.app import COMMANDS
+        cmd = next(c for c in COMMANDS if c.name == "/tag")
+        await _run_pipe_json("Python programming tutorial", cmd, guardrails=0)
+        captured = capsys.readouterr()
+        assert captured.out.endswith("\n")
+
+    def test_json_flag_parsed_by_argparse(self, monkeypatch):
+        """--json flag is recognized by _parse_args."""
+        from apple_tui import __main__ as M
+        monkeypatch.setattr(sys, "argv", ["ai", "--json", "/actions"])
+        args = M._parse_args()
+        assert args.json is True
+
+    def test_json_flag_default_is_false(self, monkeypatch):
+        """--json defaults to False."""
+        from apple_tui import __main__ as M
+        monkeypatch.setattr(sys, "argv", ["ai", "hello"])
+        args = M._parse_args()
+        assert args.json is False
+
+    def test_main_routes_to_json_pipe_when_flag_set(self, monkeypatch):
+        """main() calls _run_pipe_json when --json flag is set with a /command."""
+        from apple_tui import __main__ as M
+
+        calls = []
+
+        async def _fake_json_pipe(content, cmd, guardrails):
+            calls.append((content, cmd.name, guardrails))
+
+        monkeypatch.setattr(sys, "argv", ["ai", "--json", "/actions"])
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+        monkeypatch.setattr(sys, "stdin", __import__("io").StringIO("Buy milk. Call John."))
+        monkeypatch.setattr(M, "_run_pipe_json", _fake_json_pipe)
+
+        M.main()
+        assert len(calls) == 1
+        assert calls[0][1] == "/actions"
+
+    @pytest.mark.asyncio
+    async def test_run_pipe_json_keyboard_interrupt_exits_130(self):
+        """KeyboardInterrupt in _run_pipe_json → SystemExit(130)."""
+        from apple_tui import __main__ as M
+        from apple_tui.app import COMMANDS
+
+        async def _bad_stream(prompt, options=None):
+            raise KeyboardInterrupt
+            yield  # make it an async generator
+
+        cmd = next(c for c in COMMANDS if c.name == "/actions")
+        session = APP.make_command_session(cmd)
+        session.stream_response = _bad_stream
+
+        with patch("apple_tui.app.make_command_session", return_value=session):
+            with pytest.raises(SystemExit) as exc:
+                await M._run_pipe_json("some text", cmd, guardrails=0)
+        assert exc.value.code == 130

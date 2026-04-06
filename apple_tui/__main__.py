@@ -6,14 +6,20 @@ Entry point for the `ai` CLI command.
   ai "summarize this text"   One-shot pipe mode (prompt as argument)
   ai < file.txt              One-shot pipe mode (stdin)
   ai /summarize < file.txt   One-shot with a built-in command
+  ai --json /actions < file  Structured JSON output (pipeable to jq)
   ai --version               Print version
 """
 
 import argparse
 import asyncio
+import json
+import re
 import sys
 
 from apple_tui import __version__
+
+# Commands that produce lists — eligible for --json output
+_JSON_COMMANDS = {"/actions", "/bullets", "/entities", "/tag", "/notify"}
 
 
 def _print_help() -> None:
@@ -26,6 +32,7 @@ def _print_help() -> None:
         "  ai                          Launch interactive TUI",
         "  ai \"<prompt>\"               One-shot answer (pipe mode)",
         "  ai /command < file.txt      Run a command on stdin",
+        "  ai --json /command < file   Structured JSON output (pipe to jq)",
         "  ai --guardrails permissive  Use permissive content mode",
         "  ai --version                Show version",
         "  ai help                     Show this help",
@@ -34,7 +41,8 @@ def _print_help() -> None:
     ]
 
     for cmd in COMMANDS:
-        lines.append(f"  {cmd.name:<14}  {cmd.description}")
+        tag = "  [json]" if cmd.name in _JSON_COMMANDS else ""
+        lines.append(f"  {cmd.name:<14}  {cmd.description}{tag}")
 
     lines += [
         "",
@@ -42,6 +50,7 @@ def _print_help() -> None:
         "  ai \"what is a closure in Python?\"",
         "  ai /summarize < meeting-notes.txt",
         "  cat contract.txt | ai /formal",
+        "  ai --json /actions < notes.txt | jq '.[]'",
         "  ai /bullets < report.txt | pbcopy",
         "",
         "KEYBOARD SHORTCUTS  (inside TUI)",
@@ -77,48 +86,52 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--version", action="version", version=f"apple-tui {__version__}")
     parser.add_argument("--guardrails", choices=["default", "permissive"], default="default",
                         help="Guardrail mode for the session (default: default)")
+    parser.add_argument("--json", action="store_true", default=False,
+                        help="Output structured JSON array (use with list commands)")
     return parser.parse_args()
+
+
+def _resolve_command(first_word: str):
+    """Match a /command word against COMMANDS. Returns the Command or exits with error."""
+    from apple_tui.app import COMMANDS
+    exact = [c for c in COMMANDS if c.name == first_word]
+    prefix = [c for c in COMMANDS if c.name.startswith(first_word)] if not exact else []
+    matched = exact or prefix
+
+    if not matched:
+        close = [c.name for c in COMMANDS if first_word[1:] in c.name]
+        hint = f"  Did you mean: {', '.join(close)}" if close else ""
+        print(f"Unknown command: {first_word}{hint}", file=sys.stderr)
+        print("Run 'ai help' to see all available commands.", file=sys.stderr)
+        sys.exit(1)
+
+    if len(matched) > 1:
+        names = ", ".join(c.name for c in matched)
+        print(f"Ambiguous command '{first_word}' matches: {names}", file=sys.stderr)
+        print(f"Use a longer prefix, e.g. '{matched[0].name}'", file=sys.stderr)
+        sys.exit(1)
+
+    return matched[0]
 
 
 async def _run_pipe(prompt: str, guardrails: int) -> None:
     """Stream a single response to stdout without launching the TUI."""
-    from apple_tui.app import (
-        make_chat_session, make_command_session, check_availability, COMMANDS,
-    )
+    from apple_tui.app import make_chat_session, make_command_session, check_availability
 
     available, msg = check_availability()
     if not available:
         print(msg, file=sys.stderr)
         sys.exit(1)
 
-    # Resolve /command prefix → command session + template
     first_word = prompt.split()[0] if prompt.split() else ""
-    effective_prompt = prompt
 
     if first_word.startswith("/"):
-        # Exact match first, then prefix match
-        exact = [c for c in COMMANDS if c.name == first_word]
-        prefix = [c for c in COMMANDS if c.name.startswith(first_word)] if not exact else []
-        matched = exact or prefix
-
-        if not matched:
-            close = [c.name for c in COMMANDS if first_word[1:] in c.name]
-            hint = f"  Did you mean: {', '.join(close)}" if close else ""
-            print(f"Unknown command: {first_word}{hint}", file=sys.stderr)
-            print("Run 'ai help' to see all available commands.", file=sys.stderr)
-            sys.exit(1)
-
-        if len(matched) > 1:
-            names = ", ".join(c.name for c in matched)
-            print(f"Ambiguous command '{first_word}' matches: {names}", file=sys.stderr)
-            print(f"Use a longer prefix, e.g. '{matched[0].name}'", file=sys.stderr)
-            sys.exit(1)
-
-        cmd = matched[0]
+        cmd = _resolve_command(first_word)
         content = prompt[len(first_word):].strip()
         effective_prompt = cmd.template + content
         session = make_command_session(cmd)
     else:
+        effective_prompt = prompt
         session = make_chat_session(guardrails)
 
     last = ""
@@ -129,8 +142,59 @@ async def _run_pipe(prompt: str, guardrails: int) -> None:
             last = snapshot
         print()  # trailing newline
     except KeyboardInterrupt:
-        print()  # move cursor to clean line
-        sys.exit(130)  # standard shell exit code for Ctrl+C
+        print()
+        sys.exit(130)
+    except Exception as e:
+        print(f"\nError: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+async def _run_pipe_json(content: str, cmd, guardrails: int) -> None:
+    """Run a list command and output a JSON array to stdout."""
+    from apple_tui.app import make_command_session, check_availability
+
+    available, msg = check_availability()
+    if not available:
+        print(msg, file=sys.stderr)
+        sys.exit(1)
+
+    if cmd.name not in _JSON_COMMANDS:
+        print(
+            f"Warning: '{cmd.name}' is not a list command. "
+            f"JSON output works best with: {', '.join(sorted(_JSON_COMMANDS))}",
+            file=sys.stderr,
+        )
+
+    json_instructions = (
+        "Output ONLY a valid JSON array of strings. "
+        "No markdown code blocks, no preamble, no explanation."
+    )
+    session = make_command_session(cmd)
+    # Override instructions for JSON mode via a prefixed prompt
+    prompt = json_instructions + "\n\n" + cmd.template + content
+
+    last = ""
+    try:
+        async for snapshot in session.stream_response(prompt):
+            last = snapshot
+
+        # Strip markdown fences the model sometimes wraps around JSON
+        clean = last.strip()
+        clean = re.sub(r"^```(?:json)?\n?", "", clean)
+        clean = re.sub(r"\n?```$", "", clean).strip()
+
+        try:
+            parsed = json.loads(clean)
+            if not isinstance(parsed, list):
+                parsed = [str(parsed)]
+        except json.JSONDecodeError:
+            # Fallback: split on newlines and treat each line as an item
+            parsed = [line.strip("•- ").strip() for line in clean.splitlines() if line.strip()]
+
+        print(json.dumps(parsed, ensure_ascii=False, indent=2))
+    except KeyboardInterrupt:
+        print()
+        sys.exit(130)
     except Exception as e:
         print(f"\nError: {e}", file=sys.stderr)
         sys.exit(1)
@@ -152,13 +216,28 @@ def main() -> None:
         if args.prompt == ["help"]:
             _print_help()
             return
+
         prompt = " ".join(parts)
-        # Pipe mode — no TUI
-        try:
-            asyncio.run(_run_pipe(prompt, guardrails))
-        except KeyboardInterrupt:
-            print()
-            sys.exit(130)
+        first_word = prompt.split()[0] if prompt.split() else ""
+
+        if args.json:
+            # JSON mode requires a /command
+            if not first_word.startswith("/"):
+                print("--json requires a /command, e.g: ai --json /actions < notes.txt", file=sys.stderr)
+                sys.exit(1)
+            cmd = _resolve_command(first_word)
+            content = prompt[len(first_word):].strip()
+            try:
+                asyncio.run(_run_pipe_json(content, cmd, guardrails))
+            except KeyboardInterrupt:
+                print()
+                sys.exit(130)
+        else:
+            try:
+                asyncio.run(_run_pipe(prompt, guardrails))
+            except KeyboardInterrupt:
+                print()
+                sys.exit(130)
     else:
         # Interactive TUI mode
         from apple_tui.app import AppleIntelligenceTUI
