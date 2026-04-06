@@ -41,7 +41,7 @@ Enable Apple Intelligence: **System Settings → Apple Intelligence & Siri → E
 ## Installation
 
 ```bash
-git clone https://github.com/your-username/apple-tui.git
+git clone https://github.com/amirnaeem/apple-tui.git
 cd apple-tui
 
 python -m venv .venv

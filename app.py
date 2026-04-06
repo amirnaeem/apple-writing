@@ -22,6 +22,8 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
+from rich.markup import escape
+
 from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -334,6 +336,7 @@ class AppleIntelligenceTUI(App):
     _picker_visible: bool = False
     _active_command: Optional[Command] = None
     _spinner_frame: int = 0
+    _spinner_timer = None
 
     # ── Layout ─────────────────────────────────────────────────────────────────
 
@@ -540,9 +543,11 @@ class AppleIntelligenceTUI(App):
         )
         label = f"[bold {C_BLUE}]{command.name}[/bold {C_BLUE}]" if command else f"[bold {C_BLUE}]You[/bold {C_BLUE}]"
         history.write(label)
-        history.write(f"[{C_LABEL1}]{preview}[/{C_LABEL1}]\n")
+        history.write(f"[{C_LABEL1}]{escape(preview)}[/{C_LABEL1}]\n")
 
         self._spinner_frame = 0
+        if self._spinner_timer is not None:
+            self._spinner_timer.stop()
         self._spinner_timer = self.set_interval(0.08, self._tick_spinner)
         self.run_worker(self._stream(prompt, command=command), exclusive=True)
 
@@ -569,7 +574,7 @@ class AppleIntelligenceTUI(App):
         session = make_command_session(command) if command else self._chat_session
 
         def stop_spinner() -> None:
-            if hasattr(self, "_spinner_timer"):
+            if self._spinner_timer is not None:
                 self._spinner_timer.stop()
 
         def set_idle() -> None:
@@ -589,13 +594,13 @@ class AppleIntelligenceTUI(App):
                 preview = snapshot.split("\n")[0][:120]
                 live.update(
                     f"[bold {C_PURPLE}]◉[/bold {C_PURPLE}]"
-                    f"  [{C_LABEL2}]{preview}[/{C_LABEL2}]"
+                    f"  [{C_LABEL2}]{escape(preview)}[/{C_LABEL2}]"
                     f"[{C_PURPLE}]▌[/{C_PURPLE}]"
                 )
 
             if last:
                 history.write(f"[bold {C_PURPLE}]Apple Intelligence[/bold {C_PURPLE}]")
-                history.write(f"[{C_LABEL1}]{last}[/{C_LABEL1}]\n")
+                history.write(f"[{C_LABEL1}]{escape(last)}[/{C_LABEL1}]\n")
             set_idle()
 
         except Exception as e:
@@ -604,7 +609,7 @@ class AppleIntelligenceTUI(App):
             name = type(e).__name__
             hint = "  · Ctrl+N to reset" if "Context" in name else ""
             history.write(f"[bold {C_RED}]Error[/bold {C_RED}]")
-            history.write(f"[{C_RED}]{name}: {e}{hint}[/{C_RED}]\n")
+            history.write(f"[{C_RED}]{name}: {escape(str(e))}{hint}[/{C_RED}]\n")
 
         finally:
             self._processing = False
