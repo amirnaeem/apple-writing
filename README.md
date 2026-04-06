@@ -46,7 +46,7 @@ Enable Apple Intelligence: **System Settings → Apple Intelligence & Siri → E
 **Homebrew (recommended):**
 
 ```bash
-brew tap amirnaeem/apple-writing https://github.com/amirnaeem/apple-writing
+brew tap amirnaeem/tap
 brew install apple-tui
 ```
 
@@ -191,7 +191,7 @@ apple_tui/
   tools.py         # SDK Tool subclasses (read_file, clipboard_read, write_file)
 docs/ideas/        # Brainstorm one-pagers
 test_app.py        # TUI pytest suite (49 tests)
-test_new_modules.py # Module pytest suite (63 tests)
+test_new_modules.py # Module pytest suite (65 tests)
 ```
 
 ---
