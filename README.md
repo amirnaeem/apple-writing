@@ -4,7 +4,7 @@ A privacy-first terminal interface to Apple's on-device Foundation Models. Runs 
 
 > Requires macOS 26+ with Apple Intelligence enabled and Apple Silicon.
 
-![Python](https://img.shields.io/badge/python-3.11+-blue) ![macOS](https://img.shields.io/badge/macOS-26+-black) ![License](https://img.shields.io/badge/license-MIT-green) ![Version](https://img.shields.io/badge/version-0.3.0-purple)
+![Python](https://img.shields.io/badge/python-3.11+-blue) ![macOS](https://img.shields.io/badge/macOS-26+-black) ![License](https://img.shields.io/badge/license-MIT-green) ![Version](https://img.shields.io/badge/version-0.3.1-purple)
 
 ---
 
@@ -43,17 +43,24 @@ Enable Apple Intelligence: **System Settings → Apple Intelligence & Siri → E
 
 ## Installation
 
-**Recommended — pipx (isolated, global `ai` command):**
+**Homebrew (recommended):**
 
 ```bash
-pipx install git+https://github.com/amirnaeem/apple-tui.git
+brew tap amirnaeem/apple-writing https://github.com/amirnaeem/apple-writing
+brew install apple-tui
+```
+
+**pipx (isolated, global `ai` command):**
+
+```bash
+pipx install git+https://github.com/amirnaeem/apple-writing.git
 ```
 
 **From source:**
 
 ```bash
-git clone https://github.com/amirnaeem/apple-tui.git
-cd apple-tui
+git clone https://github.com/amirnaeem/apple-writing.git
+cd apple-writing
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 ```
@@ -191,7 +198,7 @@ test_new_modules.py # Module pytest suite (63 tests)
 
 ## Roadmap
 
-- [ ] Homebrew formula
+- [x] Homebrew formula
 - [x] `write_file` tool (with confirmation prompt)
 - [x] Structured output mode — `ai --json /actions < notes.txt | jq '.[]'`
 - [x] Named sessions with `--session <name>`
