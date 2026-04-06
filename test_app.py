@@ -35,7 +35,7 @@ def _fake_uname():
     )
 
 os.uname = _fake_uname
-import app as P   # noqa: E402  (import after monkey-patch)
+import apple_tui.app as P   # noqa: E402  (import after monkey-patch)
 os.uname = _real_uname  # restore
 
 assert P.MOCK_MODE, "Tests must run in MOCK_MODE"
