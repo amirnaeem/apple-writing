@@ -8,6 +8,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-04-06
+
+### Added
+- **Pipe mode** — `ai "prompt"`, `ai /command < file.txt`, `cat file | ai /formal`
+- **`ai help`** — lists all commands, keyboard shortcuts, examples, plugin format
+- **Plugin system** — custom `/commands` via `~/.config/apple-tui/commands/*.toml`
+- **Persistent sessions** — JSON serialized to `~/.config/apple-tui/sessions/`
+- **Tool use** — `read_file` and `clipboard_read` wired into chat sessions on real macOS
+- **`--guardrails` flag** — pipe mode guardrail control (`default` / `permissive`)
+- **Ambiguous prefix detection** — `ai /f` errors with `matches: /formal, /friendly`
+- **38 new tests** — `test_new_modules.py` covers plugins, sessions, tools, pipe mode
+
+### Fixed
+- Pipe mode `/commands` now correctly route to command sessions with templates — previously sent as raw chat, producing `null` or hallucinated responses
+- `ai help < file.txt` now shows help regardless of stdin content
+- `KeyboardInterrupt` (Ctrl+C) exits cleanly with code 130, no traceback
+- `ReadFileTool` / `ClipboardReadTool` now implement correct SDK `arguments_schema` + `call(args)` API — previously crashed on instantiation
+- Tools instantiated once at module load instead of on every session reset
+- Build backend fixed to `setuptools.build_meta`
+- `pipx install .` now works end-to-end
+
+### Security
+- All subprocess calls use list form, no `shell=True`
+- No secrets, tokens, or credentials in codebase
+
 ## [0.1.0] — 2026-04-06
 
 ### Added

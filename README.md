@@ -156,10 +156,10 @@ The app runs in **MOCK_MODE** on non-macOS systems (Linux, CI), simulating the S
 
 ```bash
 # Install dev dependencies
-pip install -e ".[dev]"
+pip install -e .
 
 # Run tests (works on any platform)
-pytest test_app.py -v
+pytest test_app.py test_new_modules.py -v
 
 # Run directly without installing
 python -m apple_tui
@@ -170,13 +170,14 @@ python -m apple_tui
 ```
 apple_tui/
   __init__.py      # version
-  __main__.py      # CLI entry point (pipe mode + TUI launcher)
+  __main__.py      # CLI entry point (pipe mode, help, TUI launcher)
   app.py           # Textual TUI application
   plugins.py       # TOML plugin loader
   sessions.py      # Persistent session storage
   tools.py         # SDK Tool subclasses (read_file, clipboard_read)
 docs/ideas/        # Brainstorm one-pagers
-test_app.py        # pytest suite (43 tests)
+test_app.py        # TUI pytest suite (43 tests)
+test_new_modules.py # Module pytest suite (38 tests)
 ```
 
 ---
