@@ -1,10 +1,10 @@
 class AppleTui < Formula
   desc "Privacy-first terminal interface to Apple's on-device Foundation Models"
   homepage "https://github.com/amirnaeem/apple-writing"
-  url "https://github.com/amirnaeem/apple-writing/archive/refs/tags/v0.3.0.tar.gz"
-  sha256 "4318e78b2098242c8396403c2998da81761f7d4eda56c1f2d94b479f7ff5f9d8"
+  url "https://github.com/amirnaeem/apple-writing/archive/refs/tags/v0.3.1.tar.gz"
+  sha256 "4f26e3cfb9ce7c34a80e24a16edfebdefa7715b533fd9bf1241115cc43cd3ede"
   license "MIT"
-  version "0.3.0"
+  version "0.3.1"
 
   depends_on "python@3.11"
   depends_on :macos
