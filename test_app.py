@@ -1,5 +1,5 @@
 """
-Tests for Apple Intelligence TUI — prototype.py
+Tests for Apple Intelligence TUI — app.py
 
 Coverage:
   - Availability check: all four reason codes
@@ -12,7 +12,7 @@ Coverage:
   - New session preserves guardrail setting
 
 Run:
-  pytest test_prototype.py -v
+  pytest test_app.py -v
 """
 
 import asyncio
@@ -23,7 +23,7 @@ import pytest
 from textual import events
 
 # ── Force MOCK_MODE so tests never hit the real SDK ───────────────────────────
-# patch os.uname before importing prototype so MOCK_MODE = True
+# patch os.uname before importing app so MOCK_MODE = True
 _real_uname = os.uname
 
 def _fake_uname():
@@ -35,7 +35,7 @@ def _fake_uname():
     )
 
 os.uname = _fake_uname
-import prototype as P   # noqa: E402  (import after monkey-patch)
+import app as P   # noqa: E402  (import after monkey-patch)
 os.uname = _real_uname  # restore
 
 assert P.MOCK_MODE, "Tests must run in MOCK_MODE"

@@ -14,7 +14,7 @@ Controls:
   Ctrl+G         Toggle guardrails (chat session only)
   Ctrl+N         New session
   Ctrl+L         Clear history
-  Ctrl+Q         Quit
+  Ctrl+C         Quit
 """
 
 import asyncio
@@ -27,7 +27,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.message import Message
 from textual.widgets import Footer, Label, RichLog, Static, TextArea
-from textual.worker import Worker, get_current_worker
+from textual.worker import get_current_worker
 
 # ── Apple Intelligence color palette (iOS/macOS dark mode system colors) ──────
 C_BG        = "#000000"   # system background
@@ -39,7 +39,6 @@ C_LABEL2    = "#8E8E93"   # secondary label
 C_LABEL1    = "#FFFFFF"   # primary label
 C_PURPLE    = "#BF5AF2"   # Apple Intelligence (system purple)
 C_BLUE      = "#0A84FF"   # system blue (user)
-C_GREEN     = "#30D158"   # system green
 C_RED       = "#FF453A"   # system red
 C_ORANGE    = "#FF9F0A"   # system orange
 C_INDIGO    = "#5E5CE6"   # system indigo
@@ -48,7 +47,7 @@ SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 # ── SDK ────────────────────────────────────────────────────────────────────────
 
-MOCK_MODE = not (os.uname().sysname == "Darwin")
+MOCK_MODE = os.uname().sysname != "Darwin"
 
 if MOCK_MODE:
     class SystemLanguageModelUseCase(int):
@@ -289,10 +288,17 @@ class AppleIntelligenceTUI(App):
     }}
     #picker-keys.visible {{ display: block; }}
 
-    /* Placeholder hint — hidden once user starts typing */
-    #input-hint {{
+    /* Separator between history and input zone */
+    #input-sep {{
         height: 1;
-        padding: 0 4;
+        border-bottom: solid {C_SEP};
+        background: {C_BG};
+    }}
+
+    /* Placeholder hint — 2 rows tall: top row is breathing space, text on row 2 */
+    #input-hint {{
+        height: 2;
+        padding: 1 4 0 4;
         color: {C_LABEL3};
     }}
 
@@ -303,7 +309,7 @@ class AppleIntelligenceTUI(App):
         height: auto;
         min-height: 3;
         max-height: 8;
-        margin: 0 3 1 3;
+        margin: 1 3 2 3;
         padding: 0 1;
     }}
     ChatInput:focus {{ border: solid {C_PURPLE}; }}
@@ -314,10 +320,10 @@ class AppleIntelligenceTUI(App):
     """
 
     BINDINGS = [
-        Binding("ctrl+g", "toggle_guardrails", "Guardrails", show=True),
+        Binding("ctrl+g", "toggle_guardrails", "Guardrails",  show=True),
         Binding("ctrl+n", "new_session",       "New Session", show=True),
         Binding("ctrl+l", "clear_history",     "Clear",       show=True),
-        Binding("ctrl+q", "quit",              "Quit",        show=True),
+        Binding("ctrl+c", "quit",              "Quit",        show=True, priority=True),
     ]
 
     _guardrails: int = 0
@@ -337,6 +343,7 @@ class AppleIntelligenceTUI(App):
         yield Static("", id="live", markup=True)
         yield Static("", id="command-picker", markup=True)
         yield Label("↑↓ navigate   Enter / Tab select   Esc dismiss", id="picker-keys")
+        yield Static("", id="input-sep")
         yield Label("/ for commands  ·  Shift+Enter for new line", id="input-hint")
         yield ChatInput(id="prompt")
         yield Footer()
