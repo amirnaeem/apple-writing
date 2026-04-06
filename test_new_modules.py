@@ -362,6 +362,69 @@ class TestClipboardReadTool:
         assert len(T.ClipboardReadTool.description) > 0
 
 
+class TestWriteFileTool:
+
+    @pytest.mark.asyncio
+    async def test_writes_content_to_file(self, tmp_path, monkeypatch):
+        """WriteFileTool writes the given content to the given path."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        target = tmp_path / "output.txt"
+        tool = T.WriteFileTool()
+        result = await tool.call(path=str(target), content="hello world")
+        assert target.read_text() == "hello world"
+
+    @pytest.mark.asyncio
+    async def test_returns_success_message(self, tmp_path, monkeypatch):
+        """WriteFileTool returns a confirmation string on success."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        target = tmp_path / "out.txt"
+        tool = T.WriteFileTool()
+        result = await tool.call(path=str(target), content="data")
+        assert isinstance(result, str)
+        assert "wrote" in result.lower() or "written" in result.lower() or str(target) in result
+
+    @pytest.mark.asyncio
+    async def test_returns_error_for_unwritable_path(self, tmp_path, monkeypatch):
+        """WriteFileTool returns an error string when the path is not writable."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        bad = tmp_path / "no_such_dir" / "file.txt"
+        tool = T.WriteFileTool()
+        result = await tool.call(path=str(bad), content="data")
+        assert "error" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_expands_tilde_in_path(self, tmp_path, monkeypatch):
+        """WriteFileTool expands ~ in paths."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        tool = T.WriteFileTool()
+        result = await tool.call(path="~/tilde_test.txt", content="tilde")
+        assert (tmp_path / "tilde_test.txt").read_text() == "tilde"
+
+    @pytest.mark.asyncio
+    async def test_rejects_path_outside_home(self, tmp_path, monkeypatch):
+        """WriteFileTool refuses writes outside the user's home directory."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        tool = T.WriteFileTool()
+        result = await tool.call(path="/etc/passwd", content="hacked")
+        assert "error" in result.lower() or "not allowed" in result.lower() or "denied" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_rejects_oversized_content(self, tmp_path):
+        """WriteFileTool rejects content larger than the allowed limit."""
+        target = tmp_path / "big.txt"
+        tool = T.WriteFileTool()
+        big_content = "x" * 200_001
+        result = await tool.call(path=str(target), content=big_content)
+        assert "error" in result.lower() or "too large" in result.lower()
+        assert not target.exists()
+
+    def test_write_file_tool_has_correct_name(self):
+        assert T.WriteFileTool.name == "write_file"
+
+    def test_write_file_tool_has_description(self):
+        assert len(T.WriteFileTool.description) > 0
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 4. Pipe mode / CLI entry point
 # ═══════════════════════════════════════════════════════════════════════════════

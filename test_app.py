@@ -422,3 +422,50 @@ class TestMockStream:
             last = snapshot
         # Final snapshot == reconstructed via deltas
         assert reconstructed == last
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. Context window usage indicator
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+class TestContextWindowIndicator:
+
+    async def test_token_estimate_starts_at_zero(self):
+        """Fresh app has _token_estimate == 0."""
+        async with make_app().run_test() as pilot:
+            assert pilot.app._token_estimate == 0
+
+    async def test_token_estimate_increases_after_response(self):
+        """After a chat exchange, _token_estimate is positive."""
+        async with make_app().run_test() as pilot:
+            await pilot.press("h", "i", "enter")
+            await pilot.pause(3.0)
+            assert pilot.app._token_estimate > 0
+
+    async def test_token_estimate_resets_on_new_session(self):
+        """Ctrl+N resets _token_estimate to 0."""
+        async with make_app().run_test() as pilot:
+            await pilot.press("h", "i", "enter")
+            await pilot.pause(3.0)
+            await pilot.press("ctrl+n")
+            await pilot.pause()
+            assert pilot.app._token_estimate == 0
+
+    async def test_token_estimate_resets_on_clear_history(self):
+        """Ctrl+L resets _token_estimate to 0."""
+        async with make_app().run_test() as pilot:
+            await pilot.press("h", "i", "enter")
+            await pilot.pause(3.0)
+            await pilot.press("ctrl+l")
+            await pilot.pause()
+            assert pilot.app._token_estimate == 0
+
+    async def test_header_shows_token_indicator(self):
+        """Header contains a token usage indicator after a response."""
+        async with make_app().run_test() as pilot:
+            await pilot.press("h", "i", "enter")
+            await pilot.pause(3.0)
+            header = str(pilot.app.query_one("#header", P.Static).render())
+            # Should show something like "42/4096" or "tokens"
+            assert "4096" in header or "tok" in header.lower()
