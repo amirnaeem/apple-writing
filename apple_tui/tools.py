@@ -1,8 +1,9 @@
 """
 SDK Tool subclasses for agentic file and clipboard access.
 
-Only safe, read-only tools are implemented in v1.
-write_file and run_shell are explicitly deferred (security boundary).
+Read-only tools: read_file, clipboard_read.
+Write tool: write_file (home-directory sandboxed, symlink-safe).
+run_shell is explicitly deferred (security boundary).
 """
 
 import os
@@ -14,10 +15,16 @@ _MAX_WRITE_BYTES = 200_000  # 200 KB cap for write_file
 
 
 def _safe_write_path(path: str) -> tuple[str, str | None]:
-    """Expand and validate path. Returns (expanded_path, error_or_None)."""
+    """Expand and validate path. Returns (expanded_path, error_or_None).
+
+    Uses realpath to follow symlinks before checking containment, preventing
+    a symlink inside ~ from pointing to a file outside the home directory.
+    """
     expanded = os.path.expanduser(path)
-    home = os.path.expanduser("~")
-    if not os.path.abspath(expanded).startswith(os.path.abspath(home)):
+    real_expanded = os.path.realpath(expanded)
+    real_home = os.path.realpath(os.path.expanduser("~"))
+    # Require the resolved path to be home itself or strictly inside it
+    if real_expanded != real_home and not real_expanded.startswith(real_home + os.sep):
         return expanded, f"Error: writing outside home directory is not allowed ({expanded})"
     return expanded, None
 

@@ -605,9 +605,10 @@ class AppleIntelligenceTUI(App):
                 # Claude Code-style response block
                 history.write(f"\n[bold {C_PURPLE}]  ◆  Apple Intelligence[/bold {C_PURPLE}]")
                 history.write(f"[{C_LABEL1}]  {escape(last)}[/{C_LABEL1}]\n")
-                # Update token estimate: prompt + response, rough 4-char-per-token heuristic
-                self._token_estimate += (len(prompt) + len(last)) // 4
-                self._render_header()
+                # Only accumulate tokens for chat — command sessions are stateless (no history)
+                if command is None:
+                    self._token_estimate += (len(prompt) + len(last)) // 4
+                    self._render_header()
             set_idle()
 
         except Exception as e:

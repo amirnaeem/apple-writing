@@ -409,14 +409,28 @@ class TestWriteFileTool:
         assert "error" in result.lower() or "not allowed" in result.lower() or "denied" in result.lower()
 
     @pytest.mark.asyncio
-    async def test_rejects_oversized_content(self, tmp_path):
-        """WriteFileTool rejects content larger than the allowed limit."""
+    async def test_rejects_oversized_content(self, tmp_path, monkeypatch):
+        """WriteFileTool rejects content larger than the allowed limit (size check, not path check)."""
+        monkeypatch.setenv("HOME", str(tmp_path))
         target = tmp_path / "big.txt"
         tool = T.WriteFileTool()
         big_content = "x" * 200_001
         result = await tool.call(path=str(target), content=big_content)
-        assert "error" in result.lower() or "too large" in result.lower()
+        assert "too large" in result.lower()
         assert not target.exists()
+
+    @pytest.mark.asyncio
+    async def test_rejects_symlink_escaping_home(self, tmp_path, monkeypatch):
+        """WriteFileTool refuses a path that is a symlink pointing outside home."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        outside = tmp_path.parent / "outside.txt"
+        outside.write_text("original")
+        link = tmp_path / "evil_link"
+        link.symlink_to(outside)
+        tool = T.WriteFileTool()
+        result = await tool.call(path=str(link), content="hacked")
+        assert "error" in result.lower() or "not allowed" in result.lower()
+        assert outside.read_text() == "original"  # file must be untouched
 
     def test_write_file_tool_has_correct_name(self):
         assert T.WriteFileTool.name == "write_file"
