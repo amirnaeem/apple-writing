@@ -8,6 +8,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-04-07
+
+### Added
+- **Homebrew formula** — `brew tap amirnaeem/apple-writing <url> && brew install apple-tui`
+  - Formula at `Formula/apple-tui.rb`; creates an isolated virtualenv via `virtualenv_create`
+  - Pinned to Python 3.11, macOS-only constraint enforced
+  - `brew test` verifies `ai --version` output matches formula version
+
+### Fixed
+- Binary stdin (e.g. `.docx`, `.pdf`) now exits 1 with a helpful conversion hint instead of
+  crashing with a raw `UnicodeEncodeError` from the SDK
+
 ## [0.3.0] — 2026-04-06
 
 ### Added

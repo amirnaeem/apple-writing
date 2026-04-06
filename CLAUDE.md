@@ -24,15 +24,16 @@ No data leaves the device. Built with Python + Textual.
 ## Project structure
 ```
 apple_tui/
-  __init__.py        # version
-  __main__.py        # CLI entry: `ai` command, pipe mode, help
-  app.py             # Textual TUI (all UI logic)
-  tools.py           # SDK Tool subclasses (read_file, clipboard_read)
+  __init__.py        # version (0.3.1)
+  __main__.py        # CLI entry: `ai` command, pipe mode, help, --json, --session
+  app.py             # Textual TUI (all UI logic, context window indicator)
+  tools.py           # SDK Tool subclasses (read_file, clipboard_read, write_file)
   plugins.py         # TOML plugin loader
-  sessions.py        # Persistent session serialization
-docs/ideas/          # Brainstorm one-pagers
-test_app.py          # TUI pytest suite (43 tests)
-test_new_modules.py  # Module pytest suite (38 tests)
+  sessions.py        # Persistent session serialization (named + date-based)
+Formula/
+  apple-tui.rb       # Homebrew tap formula
+test_app.py          # TUI pytest suite (49 tests)
+test_new_modules.py  # Module pytest suite (65 tests)
 ```
 
 ---
@@ -47,10 +48,13 @@ pytest test_app.py test_new_modules.py -v
 python -m apple_tui
 python -m apple_tui "prompt"
 python -m apple_tui /summarize < file.txt
+python -m apple_tui --json /actions < notes.txt
+python -m apple_tui --session myproject
 
 # Install
 pip install -e .                    # local editable
 python -m pipx install . --force   # global `ai` command
+brew tap amirnaeem/apple-writing https://github.com/amirnaeem/apple-writing && brew install apple-tui
 
 # Build wheel
 python -m build --wheel
@@ -63,11 +67,13 @@ python -m build --wheel
 **IMPORTANT — never violate these:**
 
 - **MOCK_MODE**: `os.uname().sysname != "Darwin"` — all non-macOS runs use mock SDK stubs. Mock classes must subclass `int` where the real SDK uses IntEnum.
-- **4096 token context window** — hard limit, no Python API to check usage
+- **4096 token context window** — hard limit, no Python API to check usage. `_token_estimate` tracks chat-only usage (not command sessions).
 - **Streaming contract**: `session.stream_response()` yields full snapshots (not deltas). Delta = `snapshot[len(last):]`. Real SDK typically yields 1 snapshot for short responses.
 - **Always escape user text**: `from rich.markup import escape` — apply before every Rich markup interpolation
 - **Timer leak guard**: cancel `_spinner_timer` before reassigning it
 - **Tool API**: real SDK `Tool` subclasses require `arguments_schema` property returning a `GenerationSchema`, and `call(self, args)` receiving `GeneratedContent`. Use `@fm.generable` + `fm.guide()` to define schemas.
+- **Binary stdin**: surrogates from binary files (docx, pdf) caught in `main()` with `.encode("utf-8")` check — exits 1 with conversion hint.
+- **write_file sandboxing**: uses `os.path.realpath` (not `abspath`) + `os.sep` suffix to prevent symlink escape attacks.
 
 ---
 
@@ -111,6 +117,7 @@ class MyTool(fm.Tool):
 - `KeyboardInterrupt` is not a subclass of `Exception` — catch it explicitly, exit with code 130
 - Pipe mode commands: detect `/command` prefix → `make_command_session(cmd)` + `cmd.template + content`
 - Build backend: `setuptools.build_meta` (not `setuptools.backends.legacy:build`)
+- Token estimate increments only for chat sessions (`command is None`) — command sessions are stateless
 
 ---
 
@@ -123,7 +130,7 @@ class MyTool(fm.Tool):
 
 ## Testing
 
-- **Always run tests after any change.** All 81 tests must stay green.
+- **Always run tests after any change.** All 114 tests must stay green.
 - Tests force `MOCK_MODE=True` by patching `os.uname` before import — never hit the real SDK
 - TDD: write a failing test first, confirm it fails, implement, confirm it passes
 - Integration tests use `pilot.pause()` after key presses — never remove these
@@ -140,6 +147,9 @@ class MyTool(fm.Tool):
 | Pipe mode outputs `null` | Command sent to chat session | Detect `/cmd` prefix, route to `make_command_session` |
 | `Static has no attribute 'renderable'` | Wrong Textual API | Use `str(static.render())` |
 | `RichLog has no attribute '_lines'` | Private API | Use `len(history.lines)` |
+| `UnicodeEncodeError: surrogates not allowed` | Binary file piped to stdin | Caught in `main()` — exits 1 with conversion hint |
+| Symlink inside `~` escaping sandbox | `abspath` doesn't follow symlinks | `_safe_write_path` uses `realpath` |
+| Token estimate grows during `/commands` | Command sessions are stateless | Guard with `if command is None` in `_stream` |
 
 ---
 
