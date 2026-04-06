@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "apple-tui"
+version = "0.2.0"
+description = "Privacy-first terminal interface to Apple's on-device Foundation Models"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    "apple-fm-sdk>=0.1.1,<0.2",
+    "textual>=8.2.3,<9",
+]
+
+[project.scripts]
+ai = "apple_tui.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/amirnaeem/apple-tui"
+Issues = "https://github.com/amirnaeem/apple-tui/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["apple_tui*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
