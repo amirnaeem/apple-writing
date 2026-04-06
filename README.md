@@ -4,7 +4,7 @@ A privacy-first terminal interface to Apple's on-device Foundation Models. Runs 
 
 > Requires macOS 26+ with Apple Intelligence enabled and Apple Silicon.
 
-![Python](https://img.shields.io/badge/python-3.11+-blue) ![macOS](https://img.shields.io/badge/macOS-26+-black) ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.11+-blue) ![macOS](https://img.shields.io/badge/macOS-26+-black) ![License](https://img.shields.io/badge/license-MIT-green) ![Version](https://img.shields.io/badge/version-0.2.0-purple)
 
 ---
 
@@ -16,12 +16,15 @@ Cloud AI (ChatGPT, Claude) sees everything you send. Apple Intelligence runs the
 
 ## Features
 
-- **Free-form chat** with persistent session memory
-- **12 built-in commands** for writing tools, smart reply, content tagging, and extraction
-- **Command picker** — type `/` to browse and select commands with `↑↓` + `Enter`
+- **Privacy-first** — 100% on-device via Apple Foundation Models, zero network calls
+- **Full TUI** — Claude Code-inspired aesthetic, dark, dense, terminal-native
+- **Pipe mode** — `ai "summarize this" < file.txt` with no UI, pure stdin/stdout
+- **12 built-in commands** — writing tools, smart reply, content tagging, extraction
+- **Command picker** — type `/` to browse, `↑↓` to navigate, `Enter` to select
+- **Plugin system** — add custom `/commands` via TOML files in `~/.config/apple-tui/commands/`
+- **Tool use** — model can read local files and clipboard mid-conversation
+- **Persistent sessions** — conversation history saved to `~/.config/apple-tui/sessions/`
 - **Guardrail toggle** — switch between default and permissive content transformations
-- **Streaming output** — see the response as it's generated
-- **Apple Intelligence color palette** — dark mode, system purple/blue accents
 
 ---
 
@@ -40,14 +43,19 @@ Enable Apple Intelligence: **System Settings → Apple Intelligence & Siri → E
 
 ## Installation
 
+**Recommended — pipx (isolated, global `ai` command):**
+
+```bash
+pipx install git+https://github.com/amirnaeem/apple-tui.git
+```
+
+**From source:**
+
 ```bash
 git clone https://github.com/amirnaeem/apple-tui.git
 cd apple-tui
-
-python -m venv .venv
-source .venv/bin/activate
-
-pip install apple-fm-sdk textual
+python -m venv .venv && source .venv/bin/activate
+pip install -e .
 ```
 
 ---
@@ -55,7 +63,16 @@ pip install apple-fm-sdk textual
 ## Usage
 
 ```bash
-python app.py
+# Interactive TUI
+ai
+
+# One-shot pipe mode
+ai "summarize this text"
+ai "what are the action items?" < meeting-notes.txt
+cat contract.txt | ai /formal
+
+# With options
+ai --guardrails permissive "rewrite this"
 ```
 
 ### Keyboard shortcuts
@@ -63,7 +80,7 @@ python app.py
 | Key | Action |
 |-----|--------|
 | `Enter` | Send message |
-| `Shift+Enter` | New line |
+| `Shift+Enter` | New line in input |
 | `/` | Open command picker |
 | `↑` `↓` | Navigate picker |
 | `Enter` / `Tab` | Select command |
@@ -73,7 +90,9 @@ python app.py
 | `Ctrl+L` | Clear history |
 | `Ctrl+C` | Quit |
 
-### Commands
+---
+
+## Built-in Commands
 
 | Command | Description |
 |---------|-------------|
@@ -92,27 +111,83 @@ python app.py
 
 ---
 
+## Custom Plugins
+
+Add your own commands by dropping a `.toml` file into `~/.config/apple-tui/commands/`:
+
+```toml
+# ~/.config/apple-tui/commands/legal.toml
+name        = "/legal"
+description = "Simplify legal text to plain English"
+template    = "Rewrite the following legal text in plain English. Preserve all meaning:\n\n"
+```
+
+Plugins appear in the command picker automatically on next launch. Share them as gists.
+
+---
+
+## Tool Use
+
+In chat mode, the model can invoke tools mid-conversation:
+
+- **`read_file`** — reads a local file by path (up to 100KB)
+- **`clipboard_read`** — reads your current clipboard contents
+
+Example: *"Summarize the file at ~/Documents/report.pdf"* — the model will call `read_file` automatically.
+
+---
+
+## How It Works
+
+- Uses [`apple-fm-sdk`](https://github.com/apple/python-apple-fm-sdk) — Apple's official Python SDK for Foundation Models
+- **Chat** uses a persistent `LanguageModelSession` (maintains conversation history across turns)
+- **Commands** use a fresh `PERMISSIVE` session per invocation (stateless text transformation)
+- **Pipe mode** shares the same stream logic as the TUI — same model, no UI overhead
+- Streaming via `session.stream_response()` — async generator yielding full snapshot strings
+- Built with [Textual](https://github.com/Textualize/textual)
+
+**Context window:** 4096 tokens (input + output). For large pastes, use `/summarize` or `/bullets` first.
+
+---
+
 ## Development
 
-The app runs in **MOCK_MODE** on non-macOS systems (Linux, CI), simulating the SDK so you can develop and test without an Apple Silicon Mac.
+The app runs in **MOCK_MODE** on non-macOS systems (Linux, CI), simulating the SDK so you can develop and test without Apple Silicon.
 
 ```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
 # Run tests (works on any platform)
-pip install pytest pytest-asyncio
 pytest test_app.py -v
+
+# Run directly without installing
+python -m apple_tui
+```
+
+### Project structure
+
+```
+apple_tui/
+  __init__.py      # version
+  __main__.py      # CLI entry point (pipe mode + TUI launcher)
+  app.py           # Textual TUI application
+  plugins.py       # TOML plugin loader
+  sessions.py      # Persistent session storage
+  tools.py         # SDK Tool subclasses (read_file, clipboard_read)
+docs/ideas/        # Brainstorm one-pagers
+test_app.py        # pytest suite (43 tests)
 ```
 
 ---
 
-## How it works
+## Roadmap
 
-- Uses [`apple-fm-sdk`](https://github.com/apple/python-apple-fm-sdk) — Apple's official Python SDK for Foundation Models
-- **Chat** uses a persistent `LanguageModelSession` (maintains conversation history)
-- **Commands** use a fresh `PERMISSIVE` session per invocation (stateless text transformation)
-- Streaming via `session.stream_response()` — an async generator yielding full snapshot strings
-- Built with [Textual](https://github.com/Textualize/textual)
-
-**Context window:** 4096 tokens (input + output). For large pastes, use `/summarize` or `/bullets` first.
+- [ ] Homebrew formula
+- [ ] `write_file` tool (with confirmation prompt)
+- [ ] Structured output mode — pipe `/actions` to `jq`
+- [ ] Named sessions with `--session <name>`
+- [ ] Context window usage indicator
 
 ---
 
