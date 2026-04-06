@@ -7,7 +7,6 @@ write_file and run_shell are explicitly deferred (security boundary).
 
 import os
 import subprocess
-import sys
 
 MOCK_MODE = os.uname().sysname != "Darwin"
 
@@ -16,14 +15,16 @@ if MOCK_MODE:
         name: str = ""
         description: str = ""
 
-        async def call(self, **kwargs):
+        async def call(self, args=None) -> str:
             return f"[mock tool: {self.name}]"
 
     class ReadFileTool(_MockTool):
         name = "read_file"
         description = "Read the contents of a file at the given path."
 
-        async def call(self, path: str) -> str:
+        async def call(self, path: str = "") -> str:
+            if not path:
+                return "Error reading file: no path provided"
             try:
                 with open(os.path.expanduser(path), encoding="utf-8") as f:
                     return f.read(8000)
@@ -34,20 +35,32 @@ if MOCK_MODE:
         name = "clipboard_read"
         description = "Read the current contents of the macOS clipboard."
 
-        async def call(self) -> str:
+        async def call(self, args=None) -> str:
             return "[mock clipboard content]"
 
 else:
+    import apple_fm_sdk as fm
     from apple_fm_sdk import Tool
 
-    class ReadFileTool(Tool):
-        """Read the contents of a local file. Useful when the user references a file by path."""
+    @fm.generable("Parameters for reading a file")
+    class _ReadFileParams:
+        path: str = fm.guide("The absolute or home-relative (~) file path to read")
 
+    @fm.generable("Parameters for reading the clipboard (no arguments needed)")
+    class _ClipboardParams:
+        unused: str = fm.guide("Pass an empty string", constant="")
+
+    class ReadFileTool(Tool):
         name = "read_file"
         description = "Read the text contents of a file at the given path on the user's Mac."
 
-        async def call(self, path: str) -> str:
+        @property
+        def arguments_schema(self):
+            return _ReadFileParams.generation_schema()
+
+        async def call(self, args) -> str:
             try:
+                path = args.value(str, for_property="path")
                 full = os.path.expanduser(path)
                 if not os.path.isfile(full):
                     return f"File not found: {path}"
@@ -57,15 +70,17 @@ else:
                 with open(full, encoding="utf-8", errors="replace") as f:
                     return f.read()
             except Exception as e:
-                return f"Error reading {path}: {e}"
+                return f"Error reading file: {e}"
 
     class ClipboardReadTool(Tool):
-        """Read the current macOS clipboard contents."""
-
         name = "clipboard_read"
         description = "Read the current text contents of the user's clipboard."
 
-        async def call(self) -> str:
+        @property
+        def arguments_schema(self):
+            return _ClipboardParams.generation_schema()
+
+        async def call(self, args) -> str:
             try:
                 result = subprocess.run(
                     ["pbpaste"], capture_output=True, text=True, timeout=3

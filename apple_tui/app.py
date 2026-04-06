@@ -181,12 +181,23 @@ def check_availability() -> tuple[bool, Optional[str]]:
 
 # ── Session factories ──────────────────────────────────────────────────────────
 
+# Tools are stateless and expensive to instantiate on real macOS (C bridge allocation).
+# Create once at module load and reuse across sessions.
+if not MOCK_MODE:
+    from apple_tui.tools import ReadFileTool, ClipboardReadTool
+    _TOOLS = [ReadFileTool(), ClipboardReadTool()]
+else:
+    _TOOLS = []
+
+
 def make_chat_session(guardrails: int) -> LanguageModelSession:
     model = SystemLanguageModel(
         use_case=SystemLanguageModelUseCase.GENERAL,
         guardrails=SystemLanguageModelGuardrails(guardrails),
     )
-    return LanguageModelSession(instructions=CHAT_SYSTEM, model=model)
+    if MOCK_MODE:
+        return LanguageModelSession(instructions=CHAT_SYSTEM, model=model)
+    return LanguageModelSession(instructions=CHAT_SYSTEM, model=model, tools=_TOOLS)
 
 def make_command_session(cmd: Command) -> LanguageModelSession:
     model = SystemLanguageModel(
