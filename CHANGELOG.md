@@ -11,9 +11,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.3.1] — 2026-04-07
 
 ### Added
-- **Homebrew formula** — `brew tap amirnaeem/apple-writing <url> && brew install apple-tui`
-  - Formula at `Formula/apple-tui.rb`; creates an isolated virtualenv via `virtualenv_create`
-  - Pinned to Python 3.11, macOS-only constraint enforced
+- **Homebrew formula** — `brew tap amirnaeem/tap && brew install apple-tui`
+  - Formula lives in dedicated tap [amirnaeem/homebrew-tap](https://github.com/amirnaeem/homebrew-tap)
+  - Creates an isolated virtualenv via `virtualenv_create`, pinned to Python 3.11, macOS-only
   - `brew test` verifies `ai --version` output matches formula version
 
 ### Fixed
