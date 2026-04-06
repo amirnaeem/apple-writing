@@ -210,6 +210,20 @@ def main() -> None:
     parts = list(args.prompt)
     if not sys.stdin.isatty():
         stdin_text = sys.stdin.read().strip()
+        # Detect binary content: surrogate chars appear when Python reads a binary
+        # file as text (e.g. .docx, .pdf, .zip). The SDK rejects surrogates with
+        # UnicodeEncodeError — catch it here with a clear message instead.
+        try:
+            stdin_text.encode("utf-8")
+        except UnicodeEncodeError:
+            print(
+                "Error: stdin contains binary data — pipe plain text only.\n"
+                "  For .docx files:  textutil -convert txt file.docx\n"
+                "                    then: ai /summarize < file.txt\n"
+                "  For .pdf files:   pdftotext file.pdf - | ai /summarize",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         if stdin_text:
             parts.append(stdin_text)
 

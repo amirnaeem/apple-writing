@@ -590,6 +590,43 @@ class TestPipeMode:
             M.main()
         assert exc.value.code == 130
 
+    def test_binary_stdin_exits_with_error(self, monkeypatch, capsys):
+        """Piping a binary file (e.g. .docx) prints a helpful error and exits 1."""
+        import io
+        from apple_tui import __main__ as M
+
+        # Simulate what Python produces when reading a binary file as text:
+        # surrogate-escaped bytes from a ZIP/docx header (PK\x03\x04 → surrogates)
+        binary_as_text = b"PK\x03\x04\xed\xa0\x80".decode("utf-8", errors="surrogateescape")
+
+        monkeypatch.setattr(sys, "argv", ["ai", "/summarize"])
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+        monkeypatch.setattr(sys, "stdin", io.StringIO(binary_as_text))
+
+        with pytest.raises(SystemExit) as exc:
+            M.main()
+        assert exc.value.code == 1
+        captured = capsys.readouterr()
+        assert "binary" in captured.err.lower() or "text" in captured.err.lower()
+
+    def test_binary_stdin_suggests_conversion(self, monkeypatch, capsys):
+        """Error message for binary stdin mentions how to convert."""
+        import io
+        from apple_tui import __main__ as M
+
+        binary_as_text = b"PK\x03\x04\xed\xa0\x80".decode("utf-8", errors="surrogateescape")
+
+        monkeypatch.setattr(sys, "argv", ["ai", "/summarize"])
+        monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+        monkeypatch.setattr(sys, "stdin", io.StringIO(binary_as_text))
+
+        with pytest.raises(SystemExit) as exc:
+            M.main()
+        assert exc.value.code == 1
+        captured = capsys.readouterr()
+        # Should hint at textutil or plain text conversion
+        assert "textutil" in captured.err or "txt" in captured.err.lower()
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 5. Structured output / JSON mode
