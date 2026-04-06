@@ -181,10 +181,10 @@ apple_tui/
   app.py           # Textual TUI application
   plugins.py       # TOML plugin loader
   sessions.py      # Persistent session storage
-  tools.py         # SDK Tool subclasses (read_file, clipboard_read)
+  tools.py         # SDK Tool subclasses (read_file, clipboard_read, write_file)
 docs/ideas/        # Brainstorm one-pagers
-test_app.py        # TUI pytest suite (43 tests)
-test_new_modules.py # Module pytest suite (38 tests)
+test_app.py        # TUI pytest suite (49 tests)
+test_new_modules.py # Module pytest suite (63 tests)
 ```
 
 ---
